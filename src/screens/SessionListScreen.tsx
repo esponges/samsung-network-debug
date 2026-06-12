@@ -32,7 +32,7 @@ export default function SessionListScreen({navigation}: Props) {
 
   useFocusEffect(
     useCallback(() => {
-      setSessions(listSessions());
+      listSessions().then(setSessions);
     }, []),
   );
 

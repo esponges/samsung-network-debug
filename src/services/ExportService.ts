@@ -1,6 +1,5 @@
 import RNFS from 'react-native-fs';
 import Share from 'react-native-share';
-import {zip} from 'react-native-zip-archive';
 import {getSessionEvents, listSessions} from '../db/database';
 import type {SessionRow, EventRow} from '../db/database';
 
@@ -23,11 +22,9 @@ function parsePayload(row: EventRow): Record<string, unknown> {
 
 // ── JSON export ───────────────────────────────────────────────────────────────
 
-export async function exportSessionJson(
-  session: SessionRow,
-): Promise<string> {
+export async function exportSessionJson(session: SessionRow): Promise<string> {
   await ensureDir();
-  const events = getSessionEvents(session.id).map(row => ({
+  const events = (await getSessionEvents(session.id)).map(row => ({
     id: row.id,
     timestamp: row.timestamp,
     type: row.type,
@@ -68,11 +65,9 @@ function rowToCsv(row: EventRow): string {
   return cols.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',') + '\n';
 }
 
-export async function exportSessionCsv(
-  session: SessionRow,
-): Promise<string> {
+export async function exportSessionCsv(session: SessionRow): Promise<string> {
   await ensureDir();
-  const events = getSessionEvents(session.id);
+  const events = await getSessionEvents(session.id);
   const csv = CSV_HEADERS + events.map(rowToCsv).join('');
 
   const path = `${EXPORT_DIR}/${session.id}.csv`;
@@ -80,30 +75,31 @@ export async function exportSessionCsv(
   return path;
 }
 
-// ── Export all → ZIP ──────────────────────────────────────────────────────────
+// ── Export all → share ────────────────────────────────────────────────────────
 
 export async function exportAll(): Promise<string> {
   await ensureDir();
-  const sessions = listSessions();
+  const sessions = await listSessions();
 
-  // Write individual files first
   for (const session of sessions) {
     await exportSessionJson(session);
     await exportSessionCsv(session);
   }
 
   const date = new Date().toISOString().slice(0, 10);
-  const zipPath = `${EXPORT_DIR}/all-sessions-${date}.zip`;
 
-  await zip(EXPORT_DIR, zipPath);
+  const filePaths = sessions.flatMap(s => [
+    `${EXPORT_DIR}/${s.id}.json`,
+    `${EXPORT_DIR}/${s.id}.csv`,
+  ]);
 
   await Share.open({
-    url: `file://${zipPath}`,
+    urls: filePaths.map(p => `file://${p}`),
     title: `All sessions export (${date})`,
     failOnCancel: false,
   });
 
-  return zipPath;
+  return `${EXPORT_DIR}/all-sessions-${date}`;
 }
 
 // ── Share helper ──────────────────────────────────────────────────────────────

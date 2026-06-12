@@ -1,12 +1,5 @@
 import {EmitterSubscription} from 'react-native';
 import TelephonyModule from '../native/TelephonyModule';
-
-function uuid(): string {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-    const r = (Math.random() * 16) | 0;
-    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
-  });
-}
 import type {
   CallStateEvent,
   TelephonyEventType,
@@ -14,11 +7,14 @@ import type {
   AudioFocusEvent,
   NetworkTypeEvent,
 } from '../native/TelephonyModule';
-import {
-  closeSession,
-  insertEvent,
-  insertSession,
-} from '../db/database';
+import {closeSession, insertEvent, insertSession} from '../db/database';
+
+function uuid(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = (Math.random() * 16) | 0;
+    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+  });
+}
 
 type AnyPayload =
   | SignalStrengthEvent
@@ -32,7 +28,7 @@ const subscriptions: EmitterSubscription[] = [];
 export function startSessionManager(): void {
   subscriptions.push(
     TelephonyModule.addListener('signal_strength', e => handleEvent('signal_strength', e)),
-    TelephonyModule.addListener('call_state', e => handleCallState(e)),
+    TelephonyModule.addListener('call_state', e => { handleCallState(e); }),
     TelephonyModule.addListener('audio_focus', e => handleEvent('audio_focus', e)),
     TelephonyModule.addListener('network_type', e => handleEvent('network_type', e)),
   );
@@ -48,19 +44,19 @@ export function getCurrentSessionId(): string | null {
   return currentSessionId;
 }
 
-function handleCallState(event: CallStateEvent): void {
+async function handleCallState(event: CallStateEvent): Promise<void> {
   const {state, timestamp} = event;
 
   if ((state === 'RINGING' || state === 'OFFHOOK') && currentSessionId === null) {
     const newId = uuid();
     currentSessionId = newId;
-    insertSession(newId, timestamp);
+    await insertSession(newId, timestamp);
   }
 
   if (state === 'IDLE' && currentSessionId !== null) {
     const sessionId = currentSessionId;
     persistEvent('call_state', event, sessionId);
-    closeSession(sessionId, timestamp);
+    await closeSession(sessionId, timestamp);
     currentSessionId = null;
     return;
   }

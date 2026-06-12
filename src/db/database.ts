@@ -1,54 +1,5 @@
-import {open, type DB} from '@op-engineering/op-sqlite';
-import {CREATE_EVENTS_TABLE, CREATE_SESSIONS_TABLE} from './schema';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type {TelephonyEventType} from '../native/TelephonyModule';
-
-let db: DB;
-
-export function initDatabase(): void {
-  db = open({name: 'samsung_debug.db'});
-  db.executeSync(CREATE_SESSIONS_TABLE);
-  db.executeSync(CREATE_EVENTS_TABLE);
-}
-
-export function getDb(): DB {
-  if (!db) {
-    throw new Error('Database not initialized. Call initDatabase() first.');
-  }
-  return db;
-}
-
-// ── Sessions ──────────────────────────────────────────────────────────────────
-
-export function insertSession(id: string, startedAt: number): void {
-  getDb().executeSync(
-    'INSERT INTO sessions (id, startedAt, endedAt) VALUES (?, ?, NULL)',
-    [id, startedAt],
-  );
-}
-
-export function closeSession(id: string, endedAt: number): void {
-  getDb().executeSync('UPDATE sessions SET endedAt = ? WHERE id = ?', [
-    endedAt,
-    id,
-  ]);
-}
-
-// ── Events ────────────────────────────────────────────────────────────────────
-
-export function insertEvent(
-  id: string,
-  sessionId: string | null,
-  timestamp: number,
-  type: TelephonyEventType,
-  payload: object,
-): void {
-  getDb().executeSync(
-    'INSERT INTO events (id, sessionId, timestamp, type, payload) VALUES (?, ?, ?, ?, ?)',
-    [id, sessionId, timestamp, type, JSON.stringify(payload)],
-  );
-}
-
-// ── Queries ───────────────────────────────────────────────────────────────────
 
 export interface SessionRow {
   id: string;
@@ -59,35 +10,110 @@ export interface SessionRow {
   callStateChanges: number;
 }
 
-export function listSessions(): SessionRow[] {
-  const result = getDb().executeSync(`
-    SELECT
-      s.id,
-      s.startedAt,
-      s.endedAt,
-      COUNT(e.id)                                              AS eventCount,
-      MIN(CAST(json_extract(e.payload, '$.dBm') AS INTEGER))  AS minDbm,
-      SUM(CASE WHEN e.type = 'call_state' THEN 1 ELSE 0 END)  AS callStateChanges
-    FROM sessions s
-    LEFT JOIN events e ON e.sessionId = s.id
-    GROUP BY s.id
-    ORDER BY s.startedAt DESC
-  `);
-  return (result.rows ?? []) as unknown as SessionRow[];
-}
-
 export interface EventRow {
   id: string;
   sessionId: string | null;
   timestamp: number;
   type: TelephonyEventType;
-  payload: string; // JSON string — parse on use
+  payload: string;
 }
 
-export function getSessionEvents(sessionId: string): EventRow[] {
-  const result = getDb().executeSync(
-    'SELECT id, sessionId, timestamp, type, payload FROM events WHERE sessionId = ? ORDER BY timestamp ASC',
-    [sessionId],
-  );
-  return (result.rows ?? []) as unknown as EventRow[];
+interface ActiveSession {
+  row: SessionRow;
+  events: EventRow[];
+}
+
+const SESSIONS_KEY = '@snd/sessions';
+const eventsKey = (sid: string) => `@snd/events:${sid}`;
+
+const active = new Map<string, ActiveSession>();
+
+export function initDatabase(): void {}
+
+async function loadSessions(): Promise<SessionRow[]> {
+  const raw = await AsyncStorage.getItem(SESSIONS_KEY);
+  return raw ? (JSON.parse(raw) as SessionRow[]) : [];
+}
+
+async function saveSessions(sessions: SessionRow[]): Promise<void> {
+  await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions));
+}
+
+export async function insertSession(id: string, startedAt: number): Promise<void> {
+  const row: SessionRow = {
+    id,
+    startedAt,
+    endedAt: null,
+    eventCount: 0,
+    minDbm: null,
+    callStateChanges: 0,
+  };
+  active.set(id, {row, events: []});
+  const sessions = await loadSessions();
+  sessions.unshift(row);
+  await saveSessions(sessions);
+}
+
+export async function closeSession(id: string, endedAt: number): Promise<void> {
+  const session = active.get(id);
+  if (!session) {
+    return;
+  }
+  active.delete(id);
+  session.row.endedAt = endedAt;
+
+  await AsyncStorage.setItem(eventsKey(id), JSON.stringify(session.events));
+
+  const sessions = await loadSessions();
+  const idx = sessions.findIndex(s => s.id === id);
+  if (idx >= 0) {
+    sessions[idx] = session.row;
+  }
+  await saveSessions(sessions);
+}
+
+// Synchronous — events are buffered in memory until closeSession flushes them
+export function insertEvent(
+  id: string,
+  sessionId: string | null,
+  timestamp: number,
+  type: TelephonyEventType,
+  payload: object,
+): void {
+  if (!sessionId) {
+    return;
+  }
+  const session = active.get(sessionId);
+  if (!session) {
+    return;
+  }
+
+  session.events.push({id, sessionId, timestamp, type, payload: JSON.stringify(payload)});
+  session.row.eventCount++;
+
+  if (type === 'signal_strength') {
+    const p = payload as {dBm?: number};
+    if (typeof p.dBm === 'number') {
+      session.row.minDbm =
+        session.row.minDbm === null
+          ? p.dBm
+          : Math.min(session.row.minDbm, p.dBm);
+    }
+  }
+  if (type === 'call_state') {
+    session.row.callStateChanges++;
+  }
+}
+
+export async function listSessions(): Promise<SessionRow[]> {
+  return loadSessions();
+}
+
+export async function getSessionEvents(sessionId: string): Promise<EventRow[]> {
+  const session = active.get(sessionId);
+  if (session) {
+    return session.events;
+  }
+  const raw = await AsyncStorage.getItem(eventsKey(sessionId));
+  return raw ? (JSON.parse(raw) as EventRow[]) : [];
 }

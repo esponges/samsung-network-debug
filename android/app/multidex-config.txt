@@ -1,0 +1,3 @@
+com/op/sqlite/OPSQLiteModule.class
+com/op/sqlite/OPSQLitePackage.class
+com/op/sqlite/OPSQLiteBridge.class

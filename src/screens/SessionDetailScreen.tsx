@@ -117,10 +117,12 @@ export default function SessionDetailScreen({route}: Props) {
 
   useFocusEffect(
     useCallback(() => {
-      const evts = getSessionEvents(sessionId);
-      setEvents(evts);
-      const sess = listSessions().find(s => s.id === sessionId);
-      setSession(sess);
+      Promise.all([getSessionEvents(sessionId), listSessions()]).then(
+        ([evts, sessions]) => {
+          setEvents(evts);
+          setSession(sessions.find(s => s.id === sessionId));
+        },
+      );
     }, [sessionId]),
   );
 

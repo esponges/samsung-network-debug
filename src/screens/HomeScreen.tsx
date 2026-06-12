@@ -38,7 +38,7 @@ export default function HomeScreen({navigation}: Props) {
   const [sessionCount, setSessionCount] = useState(0);
 
   useEffect(() => {
-    setSessionCount(listSessions().length);
+    listSessions().then(s => setSessionCount(s.length));
   }, []);
 
   const handleToggle = async () => {
@@ -58,7 +58,7 @@ export default function HomeScreen({navigation}: Props) {
       TelephonyModule.stopMonitoring();
       stopSessionManager();
       setMonitoring(false);
-      setSessionCount(listSessions().length);
+      listSessions().then(s => setSessionCount(s.length));
     }
   };
 
