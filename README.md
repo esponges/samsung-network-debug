@@ -1,97 +1,87 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# Samsung Network Debug
 
-# Getting Started
+An Android diagnostic app for capturing telephony events on a Samsung Galaxy S24 Ultra experiencing intermittent dropped calls and one-way audio. The suspected cause is a damaged sub-board flex cable — this app logs the data needed to confirm it.
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+## What it does
 
-## Step 1: Start Metro
+- **Monitors in the background** — runs as an Android foreground service so logging continues even when the app is backgrounded, the screen is off, or the Phone app is in the foreground
+- **Captures telephony events** on every change:
+  - Signal strength (dBm, ASU, level 0–4, network type)
+  - Call state transitions (IDLE → RINGING → OFFHOOK → IDLE)
+  - Network type changes (5G NR, LTE, HSPA, etc.)
+  - Audio focus changes (proxy for microphone circuit availability, since the modem owns the mic during calls and app-layer audio APIs can't read it)
+- **Groups events into sessions** — a session opens automatically when a call starts (RINGING/OFFHOOK) and closes when it ends (IDLE)
+- **Persists everything to SQLite** — events are stored on-device and survive app restarts
+- **Exports for analysis** — each session can be exported as JSON or CSV and shared via the Android share sheet; all sessions can be bundled into a ZIP archive
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+## Architecture
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+```
+React Native (TypeScript)
+  ├── src/native/TelephonyModule.ts   — typed wrapper for the Kotlin bridge
+  ├── src/services/SessionManager.ts  — session lifecycle + event persistence
+  ├── src/services/ExportService.ts   — JSON/CSV/ZIP export + share sheet
+  ├── src/db/database.ts              — op-sqlite helpers (sync JSI)
+  └── src/screens/
+        HomeScreen         — monitoring toggle + "Export All"
+        SessionListScreen  — list of captured sessions with aggregate stats
+        SessionDetailScreen — event timeline + dBm sparkline + per-session export
 
-```sh
-# Using npm
-npm start
-
-# OR using Yarn
-yarn start
+Android (Kotlin)
+  ├── TelephonyModule.kt   — ReactNative bridge (@ReactMethod)
+  ├── TelephonyService.kt  — foreground service with TelephonyCallback + AudioFocusListener
+  └── TelephonyPackage.kt  — package registration
 ```
 
-## Step 2: Build and run your app
+## Requirements
 
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
+- Android 12+ (minSdkVersion 31)
+- Physical device with cellular — emulator will not produce real telephony events
+- Permissions granted on first launch: `READ_PHONE_STATE`, `WRITE_EXTERNAL_STORAGE`, `POST_NOTIFICATIONS`
 
-### Android
+## Build & install
 
-```sh
-# Using npm
-npm run android
-
-# OR using Yarn
-yarn android
+```bash
+cd SamsungNetworkDebug
+npm install
+npx react-native run-android
 ```
 
-### iOS
+Connect the S24 Ultra via USB with debugging enabled before running.
 
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
+## Typical workflow
 
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
+1. Open the app and tap **Start Monitoring** — grant permissions when prompted
+2. Use the phone normally; make calls as usual
+3. After a dropped call or audio issue, open the app and tap **View Sessions**
+4. Select the relevant session to see the event timeline and dBm sparkline
+5. Tap **Export JSON** or **Export CSV** to share the data with a repair technician
 
-```sh
-bundle install
+## Exported data
+
+**JSON** — full session + events array:
+```json
+{
+  "session": { "id": "...", "startedAt": 1718123456789, "endedAt": 1718123512345 },
+  "events": [
+    { "timestamp": 1718123456789, "type": "signal_strength", "payload": { "dBm": -97, "asu": 18, "level": 2, "networkType": "LTE" } },
+    { "timestamp": 1718123457100, "type": "call_state", "payload": { "state": "RINGING" } }
+  ]
+}
 ```
 
-Then, and every time you update your native dependencies, run:
-
-```sh
-bundle exec pod install
+**CSV** — one row per event, suitable for Excel:
+```
+timestamp,type,dBm,asu,level,networkType,callState,audioFocus
+1718123456789,signal_strength,-97,18,2,LTE,,,
+1718123457100,call_state,,,,,"RINGING",
 ```
 
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
+## Diagnostic signals to look for
 
-```sh
-# Using npm
-npm run ios
-
-# OR using Yarn
-yarn ios
-```
-
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
-
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
-
-## Step 3: Modify your app
-
-Now that you have successfully run the app, let's make changes!
-
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
-
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
-
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
-
-## Congratulations! :tada:
-
-You've successfully run and modified your React Native App. :partying_face:
-
-### Now what?
-
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
-
-# Troubleshooting
-
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
-
-# Learn More
-
-To learn more about React Native, take a look at the following resources:
-
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+| Pattern | Likely meaning |
+|---|---|
+| dBm drops sharply during OFFHOOK | RF connection degraded during call — flex cable suspect |
+| `audio_focus: LOSS` mid-call without call ending | Audio routing circuit interrupted |
+| Network type degrades LTE → EDGE during call | Antenna connection intermittent |
+| Multiple IDLE/RINGING/OFFHOOK transitions in one call | Call state reporting unreliable — modem or baseband issue |

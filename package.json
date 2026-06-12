@@ -3,6 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
+    "emulator": "$HOME/Library/Android/sdk/emulator/emulator -avd Medium_Phone_API_36.0",
     "android": "react-native run-android",
     "ios": "react-native run-ios",
     "lint": "eslint .",
