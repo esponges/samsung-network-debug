@@ -23,7 +23,6 @@ async function requestPermissions(): Promise<boolean> {
   }
   const permissions = [
     PermissionsAndroid.PERMISSIONS.READ_PHONE_STATE,
-    PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
     PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
   ];
 
