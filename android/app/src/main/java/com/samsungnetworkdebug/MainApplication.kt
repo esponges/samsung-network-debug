@@ -1,6 +1,7 @@
 package com.samsungnetworkdebug
 
 import android.app.Application
+import android.content.Intent
 import com.facebook.react.PackageList
 import com.facebook.react.ReactApplication
 import com.facebook.react.ReactHost
@@ -22,5 +23,6 @@ class MainApplication : Application(), ReactApplication {
   override fun onCreate() {
     super.onCreate()
     loadReactNative(this)
+    startForegroundService(Intent(this, TelephonyService::class.java))
   }
 }

@@ -23,6 +23,7 @@ class TelephonyService : Service() {
 
     private val telephonyCallback = PhoneTelephonyCallback()
     private var audioFocusRequest: AudioFocusRequest? = null
+    private var isListening = false
 
     override fun onCreate() {
         super.onCreate()
@@ -37,7 +38,7 @@ class TelephonyService : Service() {
         } else {
             startForeground(NOTIFICATION_ID, buildNotification())
         }
-        registerListeners()
+        if (!isListening) registerListeners()
         return START_STICKY
     }
 
@@ -51,17 +52,18 @@ class TelephonyService : Service() {
     // ── Listeners ────────────────────────────────────────────────────────────
 
     private fun registerListeners() {
-        val executor = mainExecutor
-        telephonyManager.registerTelephonyCallback(executor, telephonyCallback)
-        registerAudioFocusListener()
+        telephonyManager.registerTelephonyCallback(mainExecutor, telephonyCallback)
+        isListening = true
     }
 
     private fun unregisterListeners() {
         telephonyManager.unregisterTelephonyCallback(telephonyCallback)
-        audioFocusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
+        abandonAudioFocus()
+        isListening = false
     }
 
-    private fun registerAudioFocusListener() {
+    private fun requestAudioFocus() {
+        if (audioFocusRequest != null) return
         val listener = AudioManager.OnAudioFocusChangeListener { focusChange ->
             val focus = when (focusChange) {
                 AudioManager.AUDIOFOCUS_GAIN -> "GAIN"
@@ -72,14 +74,17 @@ class TelephonyService : Service() {
             }
             emitAudioFocus(focus)
         }
-
         val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
             .setOnAudioFocusChangeListener(listener)
             .setWillPauseWhenDucked(false)
             .build()
-
         audioFocusRequest = request
         audioManager.requestAudioFocus(request)
+    }
+
+    private fun abandonAudioFocus() {
+        audioFocusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
+        audioFocusRequest = null
     }
 
     // ── TelephonyCallback ─────────────────────────────────────────────────────
@@ -119,9 +124,9 @@ class TelephonyService : Service() {
 
         override fun onCallStateChanged(state: Int) {
             val stateStr = when (state) {
-                TelephonyManager.CALL_STATE_IDLE -> "IDLE"
-                TelephonyManager.CALL_STATE_RINGING -> "RINGING"
-                TelephonyManager.CALL_STATE_OFFHOOK -> "OFFHOOK"
+                TelephonyManager.CALL_STATE_IDLE -> { abandonAudioFocus(); "IDLE" }
+                TelephonyManager.CALL_STATE_RINGING -> { requestAudioFocus(); "RINGING" }
+                TelephonyManager.CALL_STATE_OFFHOOK -> { requestAudioFocus(); "OFFHOOK" }
                 else -> "UNKNOWN"
             }
             emitCallState(stateStr, System.currentTimeMillis())

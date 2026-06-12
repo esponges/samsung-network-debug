@@ -10,8 +10,7 @@ import {
 } from 'react-native';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import type {RootStackParamList} from '../../App';
-import TelephonyModule from '../native/TelephonyModule';
-import {startSessionManager, stopSessionManager} from '../services/SessionManager';
+import {startSessionManager} from '../services/SessionManager';
 import {exportAll} from '../services/ExportService';
 import {listSessions} from '../db/database';
 
@@ -21,45 +20,33 @@ async function requestPermissions(): Promise<boolean> {
   if (Platform.OS !== 'android') {
     return false;
   }
-  const permissions = [
+  const results = await PermissionsAndroid.requestMultiple([
     PermissionsAndroid.PERMISSIONS.READ_PHONE_STATE,
     PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
-  ];
-
-  const results = await PermissionsAndroid.requestMultiple(permissions);
+  ]);
   return Object.values(results).every(
     r => r === PermissionsAndroid.RESULTS.GRANTED,
   );
 }
 
 export default function HomeScreen({navigation}: Props) {
-  const [monitoring, setMonitoring] = useState(false);
+  const [permissionsGranted, setPermissionsGranted] = useState(false);
   const [sessionCount, setSessionCount] = useState(0);
 
   useEffect(() => {
-    listSessions().then(s => setSessionCount(s.length));
-  }, []);
-
-  const handleToggle = async () => {
-    if (!monitoring) {
-      const granted = await requestPermissions();
-      if (!granted) {
+    requestPermissions().then(granted => {
+      if (granted) {
+        startSessionManager();
+        setPermissionsGranted(true);
+      } else {
         Alert.alert(
           'Permissions required',
-          'READ_PHONE_STATE and storage permissions are needed to monitor calls.',
+          'READ_PHONE_STATE and POST_NOTIFICATIONS are needed to monitor calls.',
         );
-        return;
       }
-      TelephonyModule.startMonitoring();
-      startSessionManager();
-      setMonitoring(true);
-    } else {
-      TelephonyModule.stopMonitoring();
-      stopSessionManager();
-      setMonitoring(false);
-      listSessions().then(s => setSessionCount(s.length));
-    }
-  };
+    });
+    listSessions().then(s => setSessionCount(s.length));
+  }, []);
 
   const handleExportAll = async () => {
     try {
@@ -73,19 +60,11 @@ export default function HomeScreen({navigation}: Props) {
     <View style={styles.container}>
       <Text style={styles.title}>Samsung Network Debug</Text>
 
-      <View style={[styles.status, monitoring ? styles.active : styles.idle]}>
+      <View style={[styles.status, permissionsGranted ? styles.active : styles.idle]}>
         <Text style={styles.statusText}>
-          {monitoring ? 'Monitoring active' : 'Monitoring stopped'}
+          {permissionsGranted ? 'Monitoring active' : 'Permissions required'}
         </Text>
       </View>
-
-      <TouchableOpacity
-        style={[styles.button, monitoring ? styles.stopBtn : styles.startBtn]}
-        onPress={handleToggle}>
-        <Text style={styles.buttonText}>
-          {monitoring ? 'Stop Monitoring' : 'Start Monitoring'}
-        </Text>
-      </TouchableOpacity>
 
       <TouchableOpacity
         style={styles.button}
@@ -133,7 +112,5 @@ const styles = StyleSheet.create({
     backgroundColor: '#1e1e2e',
     alignItems: 'center',
   },
-  startBtn: {backgroundColor: '#1a5c1a'},
-  stopBtn: {backgroundColor: '#5c1a1a'},
   buttonText: {color: '#fff', fontSize: 16, fontWeight: '600'},
 });

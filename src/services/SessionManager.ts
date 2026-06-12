@@ -26,6 +26,7 @@ let currentSessionId: string | null = null;
 const subscriptions: EmitterSubscription[] = [];
 
 export function startSessionManager(): void {
+  if (subscriptions.length > 0) return;
   subscriptions.push(
     TelephonyModule.addListener('signal_strength', e => handleEvent('signal_strength', e)),
     TelephonyModule.addListener('call_state', e => { handleCallState(e); }),
@@ -65,6 +66,7 @@ async function handleCallState(event: CallStateEvent): Promise<void> {
 }
 
 function handleEvent(type: TelephonyEventType, payload: AnyPayload): void {
+  if (currentSessionId === null) return;
   persistEvent(type, payload, currentSessionId);
 }
 
