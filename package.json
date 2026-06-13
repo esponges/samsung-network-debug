@@ -11,7 +11,9 @@
     "test": "jest",
     "build:release": "cd android && ./gradlew assembleRelease",
     "install:device": "adb install -r android/app/build/outputs/apk/release/app-release.apk",
-    "deploy": "npm run build:release && npm run install:device"
+    "install:all": "adb devices | grep -w device | grep -v emulator | awk '{print $1}' | xargs -I{} adb -s {} install -r android/app/build/outputs/apk/release/app-release.apk",
+    "deploy": "npm run build:release && npm run install:device",
+    "deploy:all": "npm run build:release && npm run install:all"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^3.1.1",

@@ -2,6 +2,7 @@ package com.samsungnetworkdebug
 
 import android.app.*
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.media.AudioFocusRequest
 import android.media.AudioManager
@@ -9,6 +10,7 @@ import android.os.Build
 import android.os.IBinder
 import android.telephony.*
 import androidx.annotation.RequiresApi
+import androidx.core.content.ContextCompat
 import com.facebook.react.bridge.Arguments
 
 class TelephonyService : Service() {
@@ -53,8 +55,19 @@ class TelephonyService : Service() {
     // ── Listeners ────────────────────────────────────────────────────────────
 
     private fun registerListeners() {
-        telephonyManager.registerTelephonyCallback(mainExecutor, telephonyCallback)
-        isListening = true
+        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.READ_PHONE_STATE)
+                != PackageManager.PERMISSION_GRANTED) {
+            // Permission not yet granted (e.g. service started via BootReceiver before the user
+            // opened the app). Stay alive; onStartCommand will be called again after the user
+            // grants the permission and the RN layer calls startSessionManager().
+            return
+        }
+        try {
+            telephonyManager.registerTelephonyCallback(mainExecutor, telephonyCallback)
+            isListening = true
+        } catch (e: SecurityException) {
+            // Shouldn't reach here after the permission check above, but guard anyway.
+        }
     }
 
     private fun unregisterListeners() {

@@ -11,7 +11,7 @@ import {
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import type {RootStackParamList} from '../../App';
 import {startSessionManager} from '../services/SessionManager';
-import {exportAll} from '../services/ExportService';
+import {exportAllSessionsJson, exportAllSessionsCsv, shareFile} from '../services/ExportService';
 import {listSessions} from '../db/database';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
@@ -48,9 +48,19 @@ export default function HomeScreen({navigation}: Props) {
     listSessions().then(s => setSessionCount(s.length));
   }, []);
 
-  const handleExportAll = async () => {
+  const handleExportJson = async () => {
     try {
-      await exportAll();
+      const path = await exportAllSessionsJson();
+      await shareFile(path);
+    } catch (e: unknown) {
+      Alert.alert('Export failed', String(e));
+    }
+  };
+
+  const handleExportCsv = async () => {
+    try {
+      const path = await exportAllSessionsCsv();
+      await shareFile(path);
     } catch (e: unknown) {
       Alert.alert('Export failed', String(e));
     }
@@ -74,9 +84,14 @@ export default function HomeScreen({navigation}: Props) {
         </Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.button} onPress={handleExportAll}>
-        <Text style={styles.buttonText}>Export All Sessions</Text>
-      </TouchableOpacity>
+      <View style={styles.exportRow}>
+        <TouchableOpacity style={[styles.button, styles.exportBtn]} onPress={handleExportJson}>
+          <Text style={styles.buttonText}>Export JSON</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.button, styles.exportBtn]} onPress={handleExportCsv}>
+          <Text style={styles.buttonText}>Export CSV</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -113,4 +128,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   buttonText: {color: '#fff', fontSize: 16, fontWeight: '600'},
+  exportRow: {flexDirection: 'row', width: '100%', gap: 10},
+  exportBtn: {flex: 1, width: undefined},
 });
