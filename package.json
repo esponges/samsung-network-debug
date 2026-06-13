@@ -8,7 +8,10 @@
     "ios": "react-native run-ios",
     "lint": "eslint .",
     "start": "react-native start",
-    "test": "jest"
+    "test": "jest",
+    "build:release": "cd android && ./gradlew assembleRelease",
+    "install:device": "adb install -r android/app/build/outputs/apk/release/app-release.apk",
+    "deploy": "npm run build:release && npm run install:device"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^3.1.1",
