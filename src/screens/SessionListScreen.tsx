@@ -38,9 +38,12 @@ export default function SessionListScreen({navigation}: Props) {
 
   const renderItem = ({item}: {item: SessionRow}) => (
     <TouchableOpacity
-      style={styles.card}
+      style={[styles.card, item.flagged && styles.cardFlagged]}
       onPress={() => navigation.navigate('SessionDetail', {sessionId: item.id})}>
-      <Text style={styles.date}>{formatDate(item.startedAt)}</Text>
+      <View style={styles.row}>
+        <Text style={styles.date}>{formatDate(item.startedAt)}</Text>
+        {item.flagged && <Text style={styles.flagBadge}>⚑ Problematic</Text>}
+      </View>
       <View style={styles.row}>
         <Text style={styles.meta}>
           Duration: {formatDuration(item.startedAt, item.endedAt)}
@@ -81,6 +84,15 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 14,
     gap: 6,
+  },
+  cardFlagged: {
+    borderLeftWidth: 3,
+    borderLeftColor: '#f87171',
+  },
+  flagBadge: {
+    color: '#f87171',
+    fontSize: 12,
+    fontWeight: '600',
   },
   date: {color: '#fff', fontSize: 15, fontWeight: '600'},
   row: {flexDirection: 'row', justifyContent: 'space-between'},

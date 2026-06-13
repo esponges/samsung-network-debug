@@ -4,14 +4,15 @@ An Android diagnostic app for capturing telephony events on a Samsung Galaxy S24
 
 ## What it does
 
-- **Monitors in the background** — runs as an Android foreground service so logging continues even when the app is backgrounded, the screen is off, or the Phone app is in the foreground
+- **Always-on monitoring** — starts automatically when the app is opened and restarts after device reboots; no manual toggle required
+- **Runs as a foreground service** — logging continues when the app is backgrounded, the screen is off, or the Phone app is in the foreground
 - **Captures telephony events** on every change:
   - Signal strength (dBm, ASU, level 0–4, network type)
   - Call state transitions (IDLE → RINGING → OFFHOOK → IDLE)
   - Network type changes (5G NR, LTE, HSPA, etc.)
   - Audio focus changes (proxy for microphone circuit availability, since the modem owns the mic during calls and app-layer audio APIs can't read it)
 - **Groups events into sessions** — a session opens automatically when a call starts (RINGING/OFFHOOK) and closes when it ends (IDLE)
-- **Persists everything to SQLite** — events are stored on-device and survive app restarts
+- **Persists everything on-device** — sessions and events survive app restarts via AsyncStorage
 - **Exports for analysis** — each session can be exported as JSON or CSV and shared via the Android share sheet; all sessions can be bundled into a ZIP archive
 
 ## Architecture
@@ -21,41 +22,46 @@ React Native (TypeScript)
   ├── src/native/TelephonyModule.ts   — typed wrapper for the Kotlin bridge
   ├── src/services/SessionManager.ts  — session lifecycle + event persistence
   ├── src/services/ExportService.ts   — JSON/CSV/ZIP export + share sheet
-  ├── src/db/database.ts              — op-sqlite helpers (sync JSI)
+  ├── src/db/database.ts              — AsyncStorage helpers (in-memory buffer, flushed on session close)
   └── src/screens/
-        HomeScreen         — monitoring toggle + "Export All"
-        SessionListScreen  — list of captured sessions with aggregate stats
+        HomeScreen          — auto-starts monitoring on mount, permissions gate, "Export All"
+        SessionListScreen   — list of captured sessions with aggregate stats
         SessionDetailScreen — event timeline + dBm sparkline + per-session export
 
 Android (Kotlin)
   ├── TelephonyModule.kt   — ReactNative bridge (@ReactMethod)
-  ├── TelephonyService.kt  — foreground service with TelephonyCallback + AudioFocusListener
-  └── TelephonyPackage.kt  — package registration
+  ├── TelephonyService.kt  — foreground service with TelephonyCallback; audio focus is held only during active calls
+  ├── TelephonyPackage.kt  — package registration
+  ├── BootReceiver.kt      — starts TelephonyService automatically on BOOT_COMPLETED
+  └── MainApplication.kt   — starts TelephonyService on app create
 ```
 
 ## Requirements
 
 - Android 12+ (minSdkVersion 31)
 - Physical device with cellular — emulator will not produce real telephony events
-- Permissions granted on first launch: `READ_PHONE_STATE`, `WRITE_EXTERNAL_STORAGE`, `POST_NOTIFICATIONS`
+- Permissions granted on first launch: `READ_PHONE_STATE`, `POST_NOTIFICATIONS`
 
 ## Build & install
 
+**Always build release** — the debug build's live reload crashes the device.
+
 ```bash
-cd SamsungNetworkDebug
 npm install
-npx react-native run-android
+npx react-native run-android --mode release --device <adb-serial>
 ```
 
-Connect the S24 Ultra via USB with debugging enabled before running.
+Get the device serial with `adb devices`. Connect the S24 Ultra via USB with debugging enabled before running.
 
 ## Typical workflow
 
-1. Open the app and tap **Start Monitoring** — grant permissions when prompted
+1. Open the app once — grant permissions when prompted, then background it
 2. Use the phone normally; make calls as usual
 3. After a dropped call or audio issue, open the app and tap **View Sessions**
 4. Select the relevant session to see the event timeline and dBm sparkline
 5. Tap **Export JSON** or **Export CSV** to share the data with a repair technician
+
+The app does not need to be in the foreground during calls. It only needs to be open (not force-closed) to capture events — the foreground service handles everything in the background.
 
 ## Exported data
 

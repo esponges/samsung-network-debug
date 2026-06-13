@@ -8,6 +8,7 @@ export interface SessionRow {
   eventCount: number;
   minDbm: number | null;
   callStateChanges: number;
+  flagged?: boolean;
 }
 
 export interface EventRow {
@@ -107,6 +108,19 @@ export function insertEvent(
 
 export async function listSessions(): Promise<SessionRow[]> {
   return loadSessions();
+}
+
+export async function flagSession(id: string, flagged: boolean): Promise<void> {
+  const sessions = await loadSessions();
+  const idx = sessions.findIndex(s => s.id === id);
+  if (idx >= 0) {
+    sessions[idx].flagged = flagged;
+    await saveSessions(sessions);
+  }
+  const session = active.get(id);
+  if (session) {
+    session.row.flagged = flagged;
+  }
 }
 
 export async function getSessionEvents(sessionId: string): Promise<EventRow[]> {

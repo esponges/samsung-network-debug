@@ -14,6 +14,7 @@ import type {RootStackParamList} from '../../App';
 import {
   getSessionEvents,
   listSessions,
+  flagSession,
   type EventRow,
   type SessionRow,
 } from '../db/database';
@@ -150,6 +151,15 @@ export default function SessionDetailScreen({route}: Props) {
     }
   };
 
+  const handleToggleFlag = async () => {
+    if (!session) {
+      return;
+    }
+    const next = !session.flagged;
+    await flagSession(session.id, next);
+    setSession({...session, flagged: next});
+  };
+
   const renderEvent = ({item}: {item: EventRow}) => (
     <View style={[styles.event, {borderLeftColor: EVENT_COLORS[item.type] ?? '#fff'}]}>
       <Text style={styles.eventTime}>{formatTime(item.timestamp)}</Text>
@@ -172,6 +182,14 @@ export default function SessionDetailScreen({route}: Props) {
           <Text style={styles.exportBtnText}>Export CSV</Text>
         </TouchableOpacity>
       </View>
+
+      <TouchableOpacity
+        style={[styles.flagBtn, session?.flagged && styles.flagBtnActive]}
+        onPress={handleToggleFlag}>
+        <Text style={[styles.flagBtnText, session?.flagged && styles.flagBtnTextActive]}>
+          {session?.flagged ? '⚑ Marked as Problematic' : '⚐ Mark as Problematic'}
+        </Text>
+      </TouchableOpacity>
 
       <FlatList
         data={events}
@@ -208,6 +226,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   exportBtnText: {color: '#60a5fa', fontSize: 14, fontWeight: '600'},
+  flagBtn: {
+    marginHorizontal: 12,
+    marginBottom: 10,
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#f87171',
+    backgroundColor: 'transparent',
+  },
+  flagBtnActive: {
+    backgroundColor: '#7f1d1d',
+  },
+  flagBtnText: {
+    color: '#f87171',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  flagBtnTextActive: {
+    color: '#fca5a5',
+  },
   event: {
     backgroundColor: '#1e1e2e',
     borderRadius: 6,
