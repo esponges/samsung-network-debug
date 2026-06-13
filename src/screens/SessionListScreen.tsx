@@ -5,11 +5,13 @@ import {
   FlatList,
   TouchableOpacity,
   StyleSheet,
+  Alert,
 } from 'react-native';
 import {useFocusEffect} from '@react-navigation/native';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import type {RootStackParamList} from '../../App';
 import {listSessions, type SessionRow} from '../db/database';
+import {exportAllSessionsCsv, exportAllSessionsJson, shareFile} from '../services/ExportService';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SessionList'>;
 
@@ -73,6 +75,24 @@ export default function SessionListScreen({navigation}: Props) {
     </TouchableOpacity>
   );
 
+  const handleExportJson = async () => {
+    try {
+      const path = await exportAllSessionsJson();
+      await shareFile(path);
+    } catch (e) {
+      Alert.alert('Export failed', String(e));
+    }
+  };
+
+  const handleExportCsv = async () => {
+    try {
+      const path = await exportAllSessionsCsv();
+      await shareFile(path);
+    } catch (e) {
+      Alert.alert('Export failed', String(e));
+    }
+  };
+
   return (
     <View style={styles.container}>
       {sessions.length === 0 ? (
@@ -84,6 +104,16 @@ export default function SessionListScreen({navigation}: Props) {
           renderItem={renderItem}
           contentContainerStyle={{padding: 16, gap: 12}}
         />
+      )}
+      {sessions.length > 0 && (
+        <View style={styles.exportRow}>
+          <TouchableOpacity style={styles.exportBtn} onPress={handleExportJson}>
+            <Text style={styles.exportBtnText}>Export all JSON</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.exportBtn} onPress={handleExportCsv}>
+            <Text style={styles.exportBtnText}>Export all CSV</Text>
+          </TouchableOpacity>
+        </View>
       )}
     </View>
   );
@@ -110,6 +140,21 @@ const styles = StyleSheet.create({
   row: {flexDirection: 'row', justifyContent: 'space-between'},
   meta: {color: '#aaa', fontSize: 13},
   warn: {color: '#f87171'},
+  exportRow: {
+    flexDirection: 'row',
+    gap: 10,
+    padding: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#222',
+  },
+  exportBtn: {
+    flex: 1,
+    backgroundColor: '#1e3a5f',
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  exportBtnText: {color: '#60a5fa', fontSize: 13, fontWeight: '600'},
   empty: {
     color: '#666',
     textAlign: 'center',
