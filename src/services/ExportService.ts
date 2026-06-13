@@ -1,7 +1,7 @@
 import RNFS from 'react-native-fs';
 import Share from 'react-native-share';
-import {getSessionEvents, listSessions} from '../db/database';
-import type {SessionRow, EventRow} from '../db/database';
+import {getSessionEvents, getConnectivityLog, listSessions} from '../db/database';
+import type {SessionRow, EventRow, ConnectivityEntry} from '../db/database';
 
 const EXPORT_DIR = `${RNFS.DownloadDirectoryPath}/samsung-debug`;
 
@@ -100,6 +100,32 @@ export async function exportAll(): Promise<string> {
   });
 
   return `${EXPORT_DIR}/all-sessions-${date}`;
+}
+
+// ── Connectivity log exports ──────────────────────────────────────────────────
+
+export async function exportConnectivityLogJson(): Promise<string> {
+  await ensureDir();
+  const entries = await getConnectivityLog();
+  const path = `${EXPORT_DIR}/connectivity-log.json`;
+  await RNFS.writeFile(path, JSON.stringify(entries, null, 2), 'utf8');
+  return path;
+}
+
+const CONNECTIVITY_CSV_HEADERS = 'id,timestamp,level,dBm,networkType\n';
+
+function connectivityEntryToCsv(entry: ConnectivityEntry): string {
+  const cols = [entry.id, entry.timestamp, entry.level, entry.dBm, entry.networkType];
+  return cols.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',') + '\n';
+}
+
+export async function exportConnectivityLogCsv(): Promise<string> {
+  await ensureDir();
+  const entries = await getConnectivityLog();
+  const csv = CONNECTIVITY_CSV_HEADERS + entries.map(connectivityEntryToCsv).join('');
+  const path = `${EXPORT_DIR}/connectivity-log.csv`;
+  await RNFS.writeFile(path, csv, 'utf8');
+  return path;
 }
 
 // ── Share helper ──────────────────────────────────────────────────────────────

@@ -7,11 +7,13 @@ import {initDatabase} from './src/db/database';
 import HomeScreen from './src/screens/HomeScreen';
 import SessionListScreen from './src/screens/SessionListScreen';
 import SessionDetailScreen from './src/screens/SessionDetailScreen';
+import ConnectivityLogScreen from './src/screens/ConnectivityLogScreen';
 
 export type RootStackParamList = {
   Home: undefined;
   SessionList: undefined;
   SessionDetail: {sessionId: string};
+  ConnectivityLog: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -37,6 +39,11 @@ export default function App() {
             name="SessionDetail"
             component={SessionDetailScreen}
             options={{title: 'Session Detail'}}
+          />
+          <Stack.Screen
+            name="ConnectivityLog"
+            component={ConnectivityLogScreen}
+            options={{title: 'Signal History'}}
           />
         </Stack.Navigator>
       </NavigationContainer>

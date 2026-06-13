@@ -110,6 +110,37 @@ export async function listSessions(): Promise<SessionRow[]> {
   return loadSessions();
 }
 
+export interface ConnectivityEntry {
+  id: string;
+  timestamp: number;
+  level: number;
+  dBm: number;
+  networkType: string;
+}
+
+const CONNECTIVITY_KEY = '@snd/connectivity';
+
+export async function appendConnectivityEntry(entry: ConnectivityEntry): Promise<void> {
+  const raw = await AsyncStorage.getItem(CONNECTIVITY_KEY);
+  const log: ConnectivityEntry[] = raw ? (JSON.parse(raw) as ConnectivityEntry[]) : [];
+  log.push(entry);
+  await AsyncStorage.setItem(CONNECTIVITY_KEY, JSON.stringify(log));
+}
+
+export async function getConnectivityLog(): Promise<ConnectivityEntry[]> {
+  const raw = await AsyncStorage.getItem(CONNECTIVITY_KEY);
+  return raw ? (JSON.parse(raw) as ConnectivityEntry[]) : [];
+}
+
+export async function getConnectivityLogForDay(date: Date): Promise<ConnectivityEntry[]> {
+  const start = new Date(date);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(date);
+  end.setHours(23, 59, 59, 999);
+  const log = await getConnectivityLog();
+  return log.filter(e => e.timestamp >= start.getTime() && e.timestamp <= end.getTime());
+}
+
 export async function flagSession(id: string, flagged: boolean): Promise<void> {
   const sessions = await loadSessions();
   const idx = sessions.findIndex(s => s.id === id);

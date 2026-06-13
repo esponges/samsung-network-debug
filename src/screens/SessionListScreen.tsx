@@ -1,4 +1,4 @@
-import React, {useCallback, useState} from 'react';
+import React, {useCallback, useEffect, useState} from 'react';
 import {
   View,
   Text,
@@ -35,6 +35,18 @@ export default function SessionListScreen({navigation}: Props) {
       listSessions().then(setSessions);
     }, []),
   );
+
+  useEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <TouchableOpacity
+          onPress={() => navigation.navigate('ConnectivityLog')}
+          style={{marginRight: 4, padding: 6}}>
+          <Text style={{color: '#60a5fa', fontSize: 13, fontWeight: '600'}}>Signal History</Text>
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation]);
 
   const renderItem = ({item}: {item: SessionRow}) => (
     <TouchableOpacity

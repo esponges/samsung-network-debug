@@ -24,6 +24,7 @@ class TelephonyService : Service() {
     private val telephonyCallback = PhoneTelephonyCallback()
     private var audioFocusRequest: AudioFocusRequest? = null
     private var isListening = false
+    private var lastEmittedLevel: Int = -1
 
     override fun onCreate() {
         super.onCreate()
@@ -120,6 +121,11 @@ class TelephonyService : Service() {
             }
 
             emitSignalStrength(dBm, asu, level, networkType, timestamp)
+
+            if (level != lastEmittedLevel) {
+                lastEmittedLevel = level
+                emitConnectivityEvent(level, dBm, networkType, timestamp)
+            }
         }
 
         override fun onCallStateChanged(state: Int) {
@@ -156,6 +162,16 @@ class TelephonyService : Service() {
             putDouble("timestamp", timestamp.toDouble())
         }
         TelephonyModule.sendTelephonyEvent("call_state", map)
+    }
+
+    private fun emitConnectivityEvent(level: Int, dBm: Int, networkType: String, timestamp: Long) {
+        val map = Arguments.createMap().apply {
+            putInt("level", level)
+            putInt("dBm", dBm)
+            putString("networkType", networkType)
+            putDouble("timestamp", timestamp.toDouble())
+        }
+        TelephonyModule.sendTelephonyEvent("connectivity_event", map)
     }
 
     private fun emitNetworkType(type: String, timestamp: Long) {

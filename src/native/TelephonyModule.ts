@@ -23,13 +23,21 @@ export interface NetworkTypeEvent {
   timestamp: number;
 }
 
-export type TelephonyEventType = 'signal_strength' | 'call_state' | 'audio_focus' | 'network_type';
+export interface ConnectivityEvent {
+  level: number;
+  dBm: number;
+  networkType: string;
+  timestamp: number;
+}
+
+export type TelephonyEventType = 'signal_strength' | 'call_state' | 'audio_focus' | 'network_type' | 'connectivity_event';
 
 export type TelephonyEventPayloadMap = {
   signal_strength: SignalStrengthEvent;
   call_state: CallStateEvent;
   audio_focus: AudioFocusEvent;
   network_type: NetworkTypeEvent;
+  connectivity_event: ConnectivityEvent;
 };
 
 const {TelephonyModule: NativeTelephonyModule} = NativeModules;

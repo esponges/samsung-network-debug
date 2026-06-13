@@ -6,8 +6,9 @@ import type {
   SignalStrengthEvent,
   AudioFocusEvent,
   NetworkTypeEvent,
+  ConnectivityEvent,
 } from '../native/TelephonyModule';
-import {closeSession, insertEvent, insertSession} from '../db/database';
+import {appendConnectivityEntry, closeSession, insertEvent, insertSession} from '../db/database';
 
 function uuid(): string {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
@@ -20,7 +21,8 @@ type AnyPayload =
   | SignalStrengthEvent
   | CallStateEvent
   | AudioFocusEvent
-  | NetworkTypeEvent;
+  | NetworkTypeEvent
+  | ConnectivityEvent;
 
 let currentSessionId: string | null = null;
 const subscriptions: EmitterSubscription[] = [];
@@ -32,6 +34,7 @@ export function startSessionManager(): void {
     TelephonyModule.addListener('call_state', e => { handleCallState(e); }),
     TelephonyModule.addListener('audio_focus', e => handleEvent('audio_focus', e)),
     TelephonyModule.addListener('network_type', e => handleEvent('network_type', e)),
+    TelephonyModule.addListener('connectivity_event', e => handleConnectivityEvent(e)),
   );
 }
 
@@ -63,6 +66,16 @@ async function handleCallState(event: CallStateEvent): Promise<void> {
   }
 
   persistEvent('call_state', event, currentSessionId);
+}
+
+function handleConnectivityEvent(event: ConnectivityEvent): void {
+  appendConnectivityEntry({
+    id: uuid(),
+    timestamp: event.timestamp,
+    level: event.level,
+    dBm: event.dBm,
+    networkType: event.networkType,
+  });
 }
 
 function handleEvent(type: TelephonyEventType, payload: AnyPayload): void {
